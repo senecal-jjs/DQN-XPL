@@ -29,19 +29,15 @@ def atari_model(img_in, num_actions, scope, reuse=False):
 
         return out
 
-def atari_learn(env,
-                session,
-                num_timesteps):
+def atari_learn(env, session, num_timesteps):
     # This is just a rough estimate
     num_iterations = float(num_timesteps) / 4.0
 
     lr_multiplier = 1.0
-    lr_schedule = PiecewiseSchedule([
-                                         (0,                   1e-4 * lr_multiplier),
-                                         (num_iterations / 10, 1e-4 * lr_multiplier),
-                                         (num_iterations / 2,  5e-5 * lr_multiplier),
-                                    ],
-                                    outside_value=5e-5 * lr_multiplier)
+    lr_schedule = PiecewiseSchedule([(0, 1e-4 * lr_multiplier),
+                                     (num_iterations / 10, 1e-4 * lr_multiplier),
+                                     (num_iterations / 2,  5e-5 * lr_multiplier)],
+                                      outside_value=5e-5 * lr_multiplier)
     optimizer = dqn.OptimizerSpec(
         constructor=tf.train.AdamOptimizer,
         kwargs=dict(epsilon=1e-4),
@@ -83,10 +79,10 @@ def atari_learn(env,
     )
     env.close()
 
-def get_available_gpus():
-    from tensorflow.python.client import device_lib
-    local_device_protos = device_lib.list_local_devices()
-    return [x.physical_device_desc for x in local_device_protos if x.device_type == 'GPU']
+# def get_available_gpus():
+#     from tensorflow.python.client import device_lib
+#     local_device_protos = device_lib.list_local_devices()
+#     return [x.physical_device_desc for x in local_device_protos if x.device_type == 'GPU']
 
 def set_global_seeds(i):
     try:
@@ -104,7 +100,7 @@ def get_session():
         inter_op_parallelism_threads=1,
         intra_op_parallelism_threads=1)
     session = tf.Session(config=tf_config)
-    print("AVAILABLE GPUS: ", get_available_gpus())
+    # print("AVAILABLE GPUS: ", get_available_gpus())
     return session
 
 def get_env(task, seed):
@@ -116,7 +112,11 @@ def get_env(task, seed):
     env.seed(seed)
 
     expt_dir = '/tmp/hw3_vid_dir2/'
-    env = wrappers.Monitor(env, osp.join(expt_dir, "gym"), force=True)
+
+    # Some code to change the rate at which videos are recorded
+    env = wrappers.Monitor(env, osp.join(expt_dir, "gym"), force=True, video_callable=lambda episode_id: episode_id%100==0)
+
+    # env = wrappers.Monitor(env, osp.join(expt_dir, "gym"), force=True)
     env = wrap_deepmind(env)
 
     return env

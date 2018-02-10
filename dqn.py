@@ -7,7 +7,7 @@ import tensorflow                as tf
 import tensorflow.contrib.layers as layers
 from collections import namedtuple
 from dqn_utils import *
-from memory import ReplayBuffer 
+from memory import ReplayBuffer
 import pickle
 
 OptimizerSpec = namedtuple("OptimizerSpec", ["constructor", "kwargs", "lr_schedule"])
@@ -17,7 +17,6 @@ def learn(env,
           q_func,
           optimizer_spec,
           session,
-          #exploration=LinearSchedule(1000000, 0.1),
           stopping_criterion=None,
           replay_buffer_size=1000000,
           batch_size=32,
@@ -110,27 +109,6 @@ def learn(env,
     obs_t_float   = tf.cast(obs_t_ph,   tf.float32) / 255.0
     obs_tp1_float = tf.cast(obs_tp1_ph, tf.float32) / 255.0
 
-    # Here, you should fill in your own code to compute the Bellman error. This requires
-    # evaluating the current and next Q-values and constructing the corresponding error.
-    # TensorFlow will differentiate this error for you, you just need to pass it to the
-    # optimizer. See assignment text for details.
-    # Your code should produce one scalar-valued tensor: total_error
-    # This will be passed to the optimizer in the provided code below.
-    # Your code should also produce two collections of variables:
-    # q_func_vars
-    # target_q_func_vars
-    # These should hold all of the variables of the Q-function network and target network,
-    # respectively. A convenient way to get these is to make use of TF's "scope" feature.
-    # For example, you can create your Q-function network with the scope "q_func" like this:
-    # <something> = q_func(obs_t_float, num_actions, scope="q_func", reuse=False)
-    # And then you can obtain the variables like this:
-    # q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='q_func')
-    # Older versions of TensorFlow may require using "VARIABLES" instead of "GLOBAL_VARIABLES"
-    ######
-
-    # YOUR CODE HERE
-
-    ######
     # Declare variables for logging
     t_log = []
     mean_reward_log = []
@@ -138,16 +116,21 @@ def learn(env,
     episodes_log = []
     exploration_log = []
     learning_rate_log = []
+
+    # Create a network to produce the current q values for each possible action
     current_q_func = q_func(obs_t_float, num_actions, scope="q_func", reuse=False) # Current Q-Value Function
     q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='q_func')
 
+    # Creat the target q function network
     target_q_func = q_func(obs_tp1_float, num_actions, scope="target_q_func", reuse=False) # Target Q-Value Function
     target_q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='target_q_func')
 
+    # Encode actions as as a one hot vector, based on the action that was chosen
     act_t = tf.one_hot(act_t_ph, depth=num_actions, dtype=tf.float32, name="action_one_hot")
     q_act_t = tf.reduce_sum(act_t*current_q_func, axis=1)
 
-    y = rew_t_ph + gamma * tf.reduce_max(target_q_func, reduction_indices=[1]) #which axis for max?
+    # Calculate the current reward, and use that to get the loss function
+    y = rew_t_ph + gamma * tf.reduce_max(target_q_func, reduction_indices=[1])
     total_error = tf.square(tf.subtract(y, q_act_t)) #(reward + gamma*V(s') - Q(s, a))**2
 
     # construct optimization op (with gradient clipping)
@@ -184,37 +167,15 @@ def learn(env,
 
         ### 2. Step the env and store the transition
         # At this point, "last_obs" contains the latest observation that was
-        # recorded from the simulator. Here, your code needs to store this
-        # observation and its outcome (reward, next observation, etc.) into
-        # the replay buffer while stepping the simulator forward one step.
-        # At the end of this block of code, the simulator should have been
-        # advanced one step, and the replay buffer should contain one more
-        # transition.
-        # Specifically, last_obs must point to the new latest observation.
-        # Useful functions you'll need to call:
-        # obs, reward, done, info = env.step(action)
-        # this steps the environment forward one step
-        # obs = env.reset()
-        # this resets the environment if you reached an episode boundary.
-        # Don't forget to call env.reset() to get a new observation if done
-        # is true!!
+        # recorded from the simulator.
         # Note that you cannot use "last_obs" directly as input
         # into your network, since it needs to be processed to include context
-        # from previous frames. You should check out the replay buffer
-        # implementation in dqn_utils.py to see what functionality the replay
-        # buffer exposes. The replay buffer has a function called
+        # from previous frames. The replay buffer has a function called
         # encode_recent_observation that will take the latest observation
         # that you pushed into the buffer and compute the corresponding
         # input that should be given to a Q network by appending some
         # previous frames.
-        # Don't forget to include epsilon greedy exploration!
-        # And remember that the first time you enter this loop, the model
-        # may not yet have been initialized (but of course, the first step
-        # might as well be random, since you haven't trained your net...)
 
-        #####
-
-        # YOUR CODE HERE
         # Store last_obs into replay buffer
         idx = replay_buffer.store_frame(last_obs)
 
@@ -228,16 +189,6 @@ def learn(env,
         else:
             input_batch = replay_buffer.encode_recent_observation()
             act = policy.select_action(current_q_func, input_batch, obs_t_ph)
-        # epsilon = exploration.value(t)
-        #
-        # if not model_initialized or random.random() < epsilon:
-        #     # With probability epsilon OR if model hasn't been initialized, choose a random action
-        #     act = env.action_space.sample()
-        # else:
-        #     # With probability 1 - epsilon, choose the best action from Q
-        #     input_batch = replay_buffer.encode_recent_observation()
-        #     q_vals = session.run(current_q_func, {obs_t_ph: input_batch[None, :]})
-        #     act = np.argmax(q_vals)
 
         # Step simulator forward one step
         last_obs, reward, done, info = env.step(act)
@@ -295,7 +246,6 @@ def learn(env,
             # variable num_param_updates useful for this (it was initialized to 0)
             #####
 
-            # YOUR CODE HERE
             # 3.a Sample a batch of transitions
             obs_t_batch, act_batch, rew_batch, obs_tp1_batch, done_mask = replay_buffer.sample(batch_size)
 
@@ -312,7 +262,7 @@ def learn(env,
             session.run(train_fn, {obs_t_ph: obs_t_batch, act_t_ph: act_batch, rew_t_ph: rew_batch, obs_tp1_ph: obs_tp1_batch,
                 done_mask_ph: done_mask, learning_rate: optimizer_spec.lr_schedule.value(t)})
 
-            # 3.d Update target network every taret_update_freq steps
+            # 3.d Update target network every target_update_freq steps
             if t % target_update_freq == 0:
                 session.run(update_target_fn)
                 num_param_updates += 1

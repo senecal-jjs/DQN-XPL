@@ -52,14 +52,6 @@ def atari_learn(env, session, num_timesteps):
     # Create action exploration/exploitation policy
     policy = LinearAnnealedPolicy(session=session, env=env, num_iterations=num_iterations)
 
-    # exploration_schedule = PiecewiseSchedule(
-    #     [
-    #         (0, 1.0),
-    #         (1e6, 0.1),
-    #         (num_iterations / 2, 0.01),
-    #     ], outside_value=0.01
-    # )
-
     dqn.learn(
         env,
         policy = policy,
@@ -79,10 +71,6 @@ def atari_learn(env, session, num_timesteps):
     )
     env.close()
 
-# def get_available_gpus():
-#     from tensorflow.python.client import device_lib
-#     local_device_protos = device_lib.list_local_devices()
-#     return [x.physical_device_desc for x in local_device_protos if x.device_type == 'GPU']
 
 def set_global_seeds(i):
     try:
@@ -111,12 +99,10 @@ def get_env(task, seed):
     set_global_seeds(seed)
     env.seed(seed)
 
-    expt_dir = '/tmp/hw3_vid_dir2/'
+    expt_dir = '/tmp/dqn/'
 
     # Some code to change the rate at which videos are recorded
     env = wrappers.Monitor(env, osp.join(expt_dir, "gym"), force=True, video_callable=lambda episode_id: episode_id%100==0)
-
-    # env = wrappers.Monitor(env, osp.join(expt_dir, "gym"), force=True)
     env = wrap_deepmind(env)
 
     return env
@@ -125,8 +111,8 @@ def main():
     # Get Atari games.
     benchmark = gym.benchmark_spec('Atari40M')
 
-    # Change the index to select a different game.
-    task = benchmark.tasks[3]
+    # Change the index to select a different game. 3 is pong, 4 is Q*bert, 1 is breakout, 5 is seaquest, 6 is space invaders
+    task = benchmark.tasks[6]
 
     # Run training
     seed = 0 # Use a seed of zero (you may want to randomize the seed!)

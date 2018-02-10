@@ -129,15 +129,22 @@ def learn(env,
     act_t = tf.one_hot(act_t_ph, depth=num_actions, dtype=tf.float32, name="action_one_hot")
     q_act_t = tf.reduce_sum(act_t*current_q_func, axis=1)
 
+    # ===============
+    # we have the chosen action in act_t, use that to get the q value of the action from
+    # the target network
+    best_actions = tf.argmax(q_act_t, output_type=tf.int32)
+    target = target_q_func[best_actions]
+    y = rew_t_ph + gamma * target
+    #####
+
     # Calculate the current reward, and use that to get the loss function
-    y = rew_t_ph + gamma * tf.reduce_max(target_q_func, reduction_indices=[1])
+    # y = rew_t_ph + gamma * tf.reduce_max(target_q_func, reduction_indices=[1])
     total_error = tf.square(tf.subtract(y, q_act_t)) #(reward + gamma*V(s') - Q(s, a))**2
 
     # construct optimization op (with gradient clipping)
     learning_rate = tf.placeholder(tf.float32, (), name="learning_rate")
     optimizer = optimizer_spec.constructor(learning_rate=learning_rate, **optimizer_spec.kwargs)
-    train_fn = minimize_and_clip(optimizer, total_error,
-                 var_list=q_func_vars, clip_val=grad_norm_clipping)
+    train_fn = minimize_and_clip(optimizer, total_error, var_list=q_func_vars, clip_val=grad_norm_clipping)
 
     # update_target_fn will be called periodically to copy Q network to target Q network
     update_target_fn = []

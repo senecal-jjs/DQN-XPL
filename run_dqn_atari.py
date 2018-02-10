@@ -112,10 +112,10 @@ def main():
     benchmark = gym.benchmark_spec('Atari40M')
 
     # Change the index to select a different game. 3 is pong, 4 is Q*bert, 1 is breakout, 5 is seaquest, 6 is space invaders
-    task = benchmark.tasks[6]
+    task = benchmark.tasks[3]
 
     # Run training
-    seed = 0 # Use a seed of zero (you may want to randomize the seed!)
+    seed = 0 #random.randint(0, 5) # Use a seed of zero (you may want to randomize the seed!)
     env = get_env(task, seed)
     session = get_session()
     atari_learn(env, session, num_timesteps=task.max_timesteps)

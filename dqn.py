@@ -132,8 +132,9 @@ def learn(env,
     # ===============
     # we have the chosen action in act_t, use that to get the q value of the action from
     # the target network
-    best_actions = tf.argmax(q_act_t, output_type=tf.int32)
-    target = target_q_func[best_actions]
+    best_actions = tf.argmax(current_q_func, axis=1)
+    row_index = np.arange(batch_size)
+    target = tf.gather_nd(target_q_func, [[row_index[i], best_actions[i]] for i in range(batch_size)])
     y = rew_t_ph + gamma * target
     #####
 

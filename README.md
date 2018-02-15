@@ -11,5 +11,3 @@ Deep Q learning, with a separate target net is used to train an agent to play be
 The agent has been tested on Pong and Space Invaders.
 
 This repo uses base code provided by Berkeley and Open AI to perform the environment preprocessing. 
-
-https://github.com/berkeleydeeprlcourse/homework/tree/master/hw3

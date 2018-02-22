@@ -1,9 +1,10 @@
 import sys
+import os 
 import gym.spaces
 import itertools
 import numpy as np
 import random
-import tensorflow                as tf
+import tensorflow as tf
 import tensorflow.contrib.layers as layers
 from collections import namedtuple
 from dqn_utils import *
@@ -91,19 +92,19 @@ def learn(env,
 
     # set up placeholders
     # placeholder for current observation (or state)
-    obs_t_ph              = tf.placeholder(tf.uint8, [None] + list(input_shape))
+    obs_t_ph = tf.placeholder(tf.uint8, [None] + list(input_shape))
     # placeholder for current action
-    act_t_ph              = tf.placeholder(tf.int32,   [None])
+    act_t_ph = tf.placeholder(tf.int32,   [None])
     # placeholder for current reward
-    rew_t_ph              = tf.placeholder(tf.float32, [None])
+    rew_t_ph = tf.placeholder(tf.float32, [None])
     # placeholder for next observation (or state)
-    obs_tp1_ph            = tf.placeholder(tf.uint8, [None] + list(input_shape))
+    obs_tp1_ph = tf.placeholder(tf.uint8, [None] + list(input_shape))
     # placeholder for end of episode mask
     # this value is 1 if the next state corresponds to the end of an episode,
     # in which case there is no Q-value at the next state; at the end of an
     # episode, only the current state reward contributes to the target, not the
     # next state Q-value (i.e. target is just rew_t_ph, not rew_t_ph + gamma * q_tp1)
-    done_mask_ph          = tf.placeholder(tf.float32, [None])
+    done_mask_ph = tf.placeholder(tf.float32, [None])
 
     # casting to float on GPU ensures lower data transfer times.
     obs_t_float   = tf.cast(obs_t_ph,   tf.float32) / 255.0
@@ -116,6 +117,7 @@ def learn(env,
     episodes_log = []
     exploration_log = []
     learning_rate_log = []
+    global_step = tf.Variable(0, trainable=False, name='global_step')
 
     # Create a network to produce the current q values for each possible action
     current_q_func = q_func(obs_t_float, num_actions, scope="q_func", reuse=False) # Current Q-Value Function
@@ -129,14 +131,12 @@ def learn(env,
     act_t = tf.one_hot(act_t_ph, depth=num_actions, dtype=tf.float32, name="action_one_hot")
     q_act_t = tf.reduce_sum(act_t*current_q_func, axis=1)
 
-    # ===============
     # we have the chosen action in act_t, use that to get the q value of the action from
     # the target network
     best_actions = tf.argmax(current_q_func, axis=1)
     row_index = np.arange(batch_size)
     target = tf.gather_nd(target_q_func, [[row_index[i], best_actions[i]] for i in range(batch_size)])
     y = rew_t_ph + gamma * target
-    #####
 
     # Calculate the current reward, and use that to get the loss function
     # y = rew_t_ph + gamma * tf.reduce_max(target_q_func, reduction_indices=[1])
@@ -165,10 +165,36 @@ def learn(env,
     mean_episode_reward      = -float('nan')
     best_mean_episode_reward = -float('inf')
     last_obs = env.reset()
+    t = 0
     LOG_EVERY_N_STEPS = 10000
     SAVE_EVERY_N_STEPS = 200000
 
-    for t in itertools.count():
+    # Create directory to save model and checkpoints, as well as data
+    checkpoint_dir = os.path.join(os.getcwd(), "checkpoints")
+    checkpoint_path = os.path.join(checkpoint_dir, "model")
+    data_dir = os.path.join(os.getcwd(), "experiment_data")
+
+    if not os.path.exists(checkpoint_dir):
+        os.makedirs(checkpoint_dir)
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+
+    # Create tensorflow saver for model checkpointing
+    saver = tf.train.Saver()
+
+    # Load a previous checkpoint if we find one
+    latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir)
+    if latest_checkpoint:
+        print("Loading model checkpoint {}...\n".format(latest_checkpoint))
+        saver.restore(session, latest_checkpoint)
+    
+        # Get the current time step
+        t = session.run(tf.train.get_global_step())
+        print(t)
+
+    print("Restored t: {0}".format(t))
+    
+    while True:
         ### 1. Check stopping criterion
         if stopping_criterion is not None and stopping_criterion(env, t):
             break
@@ -177,10 +203,10 @@ def learn(env,
         # At this point, "last_obs" contains the latest observation that was
         # recorded from the simulator.
         # Note that you cannot use "last_obs" directly as input
-        # into your network, since it needs to be processed to include context
+        # into the network, since it needs to be processed to include context
         # from previous frames. The replay buffer has a function called
         # encode_recent_observation that will take the latest observation
-        # that you pushed into the buffer and compute the corresponding
+        # that was pushed into the buffer and compute the corresponding
         # input that should be given to a Q network by appending some
         # previous frames.
 
@@ -196,7 +222,7 @@ def learn(env,
             act = env.action_space.sample()
         else:
             input_batch = replay_buffer.encode_recent_observation()
-            act = policy.select_action(current_q_func, input_batch, obs_t_ph)
+            act = policy.select_action(current_q_func, input_batch, obs_t_ph, t)
 
         # Step simulator forward one step
         last_obs, reward, done, info = env.step(act)
@@ -216,44 +242,7 @@ def learn(env,
         # note that this is only done if the replay buffer contains enough samples
         # for us to learn something useful -- until then, the model will not be
         # initialized and random actions should be taken
-        if (t > learning_starts and
-                t % learning_freq == 0 and
-                replay_buffer.can_sample(batch_size)):
-            # Here, you should perform training. Training consists of four steps:
-            # 3.a: use the replay buffer to sample a batch of transitions (see the
-            # replay buffer code for function definition, each batch that you sample
-            # should consist of current observations, current actions, rewards,
-            # next observations, and done indicator).
-            # 3.b: initialize the model if it has not been initialized yet; to do
-            # that, call
-            #    initialize_interdependent_variables(session, tf.global_variables(), {
-            #        obs_t_ph: obs_t_batch,
-            #        obs_tp1_ph: obs_tp1_batch,
-            #    })
-            # where obs_t_batch and obs_tp1_batch are the batches of observations at
-            # the current and next time step. The boolean variable model_initialized
-            # indicates whether or not the model has been initialized.
-            # Remember that you have to update the target network too (see 3.d)!
-            # 3.c: train the model. To do this, you'll need to use the train_fn and
-            # total_error ops that were created earlier: total_error is what you
-            # created to compute the total Bellman error in a batch, and train_fn
-            # will actually perform a gradient step and update the network parameters
-            # to reduce total_error. When calling session.run on these you'll need to
-            # populate the following placeholders:
-            # obs_t_ph
-            # act_t_ph
-            # rew_t_ph
-            # obs_tp1_ph
-            # done_mask_ph
-            # (this is needed for computing total_error)
-            # learning_rate -- you can get this from optimizer_spec.lr_schedule.value(t)
-            # (this is needed by the optimizer to choose the learning rate)
-            # 3.d: periodically update the target network by calling
-            # session.run(update_target_fn)
-            # you should update every target_update_freq steps, and you may find the
-            # variable num_param_updates useful for this (it was initialized to 0)
-            #####
-
+        if (t > learning_starts and t % learning_freq == 0 and replay_buffer.can_sample(batch_size)):
             # 3.a Sample a batch of transitions
             obs_t_batch, act_batch, rew_batch, obs_tp1_batch, done_mask = replay_buffer.sample(batch_size)
 
@@ -267,7 +256,7 @@ def learn(env,
                 model_initialized = True
 
             # 3.c Train the model using train_fn and total_error
-            session.run(train_fn, {obs_t_ph: obs_t_batch, act_t_ph: act_batch, rew_t_ph: rew_batch, obs_tp1_ph: obs_tp1_batch,
+            global_step, _ = session.run([tf.train.get_global_step(), train_fn], {obs_t_ph: obs_t_batch, act_t_ph: act_batch, rew_t_ph: rew_batch, obs_tp1_ph: obs_tp1_batch,
                 done_mask_ph: done_mask, learning_rate: optimizer_spec.lr_schedule.value(t)})
 
             # 3.d Update target network every target_update_freq steps
@@ -283,6 +272,8 @@ def learn(env,
         if len(episode_rewards) > 100:
             best_mean_episode_reward = max(best_mean_episode_reward, mean_episode_reward)
         if t % LOG_EVERY_N_STEPS == 0 and model_initialized:
+            # Save the current checkpoint
+            saver.save(session, checkpoint_path, global_step=t)
             print("Timestep %d" % (t,))
             t_log.append(t)
             print("mean reward (100 episodes) %f" % mean_episode_reward)
@@ -293,7 +284,7 @@ def learn(env,
             episodes_log.append(len(episode_rewards))
             print("exploration %f" % policy.current_eps)
             exploration_log.append(policy.current_eps)
-            print("learning_rate %f" % optimizer_spec.lr_schedule.value(t))
+            print("learning_rate %f\n" % optimizer_spec.lr_schedule.value(t))
             learning_rate_log.append(optimizer_spec.lr_schedule.value(t))
             sys.stdout.flush()
 
@@ -303,3 +294,6 @@ def learn(env,
             output_file_name = 'space'+str(lr_multiplier)+'_' + str(t) + '_data.pkl'
             with open(output_file_name, 'wb') as f:
                 pickle.dump(training_log, f)
+
+        # Increment time step 
+        t += 1

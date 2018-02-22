@@ -300,6 +300,6 @@ def learn(env,
         if t % SAVE_EVERY_N_STEPS == 0 and model_initialized:
             training_log = ({'t_log': t_log, 'mean_reward_log': mean_reward_log, 'best_mean_log': best_mean_log, 'episodes_log': episodes_log,
                 'exploration_log': exploration_log, 'learning_rate_log': learning_rate_log})
-            output_file_name = 'ram_lr'+str(lr_multiplier)+'_' + str(t) + '_data.pkl'
+            output_file_name = 'space'+str(lr_multiplier)+'_' + str(t) + '_data.pkl'
             with open(output_file_name, 'wb') as f:
                 pickle.dump(training_log, f)

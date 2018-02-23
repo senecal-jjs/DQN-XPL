@@ -145,7 +145,7 @@ def learn(env,
     # construct optimization op (with gradient clipping)
     learning_rate = tf.placeholder(tf.float32, (), name="learning_rate")
     optimizer = optimizer_spec.constructor(learning_rate=learning_rate, **optimizer_spec.kwargs)
-    train_fn = minimize_and_clip(optimizer, total_error, var_list=q_func_vars, clip_val=grad_norm_clipping)
+    train_fn = minimize_and_clip(optimizer, total_error, var_list=q_func_vars, clip_val=grad_norm_clipping, global_step=global_step)
 
     # update_target_fn will be called periodically to copy Q network to target Q network
     update_target_fn = []
@@ -166,12 +166,14 @@ def learn(env,
     best_mean_episode_reward = -float('inf')
     last_obs = env.reset()
     t = 0
+    restore = False 
     LOG_EVERY_N_STEPS = 10000
     SAVE_EVERY_N_STEPS = 200000
 
     # Create directory to save model and checkpoints, as well as data
     checkpoint_dir = os.path.join(os.getcwd(), "checkpoints")
     checkpoint_path = os.path.join(checkpoint_dir, "model")
+    buffer_path = os.path.join(checkpoint_dir, "buffer.pkl")
     data_dir = os.path.join(os.getcwd(), "experiment_data")
 
     if not os.path.exists(checkpoint_dir):
@@ -185,15 +187,30 @@ def learn(env,
     # Load a previous checkpoint if we find one
     latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir)
     if latest_checkpoint:
-        print("Loading model checkpoint {}...\n".format(latest_checkpoint))
+        print("\nLoading model checkpoint {}...\n".format(latest_checkpoint))
         saver.restore(session, latest_checkpoint)
     
-        # Get the current time step
-        t = session.run(tf.train.get_global_step())
-        print(t)
+        # Get the current time step (global step counter is only saved )
+        t = learning_freq*session.run(tf.train.get_global_step()) + learning_starts
 
-    print("Restored t: {0}".format(t))
-    
+        # Repopulate experience replay buffer
+        print("Repopulating experience replay buffer.")
+        # Store last_obs into replay buffer
+        idx = replay_buffer.store_frame(last_obs)
+        act, reward, done = env.action_space.sample(), 0, False
+        for _ in range(learning_starts):
+            # choose random action
+            act = env.action_space.sample()
+            # Step simulator forward one step
+            last_obs, reward, done, info = env.step(act)
+            replay_buffer.store_effect(idx, act, reward, done) # Store action taken after last_obs and corresponding reward
+
+            if done == True: # done was True in latest transition; we have already stored that
+                last_obs = env.reset() # Reset observation
+                done = False
+
+        print("Model successfully restored at timestep {0}!".format(t))
+
     while True:
         ### 1. Check stopping criterion
         if stopping_criterion is not None and stopping_criterion(env, t):
@@ -256,7 +273,7 @@ def learn(env,
                 model_initialized = True
 
             # 3.c Train the model using train_fn and total_error
-            global_step, _ = session.run([tf.train.get_global_step(), train_fn], {obs_t_ph: obs_t_batch, act_t_ph: act_batch, rew_t_ph: rew_batch, obs_tp1_ph: obs_tp1_batch,
+            session.run(train_fn, {obs_t_ph: obs_t_batch, act_t_ph: act_batch, rew_t_ph: rew_batch, obs_tp1_ph: obs_tp1_batch,
                 done_mask_ph: done_mask, learning_rate: optimizer_spec.lr_schedule.value(t)})
 
             # 3.d Update target network every target_update_freq steps
@@ -274,6 +291,7 @@ def learn(env,
         if t % LOG_EVERY_N_STEPS == 0 and model_initialized:
             # Save the current checkpoint
             saver.save(session, checkpoint_path, global_step=t)
+
             print("Timestep %d" % (t,))
             t_log.append(t)
             print("mean reward (100 episodes) %f" % mean_episode_reward)
@@ -291,7 +309,7 @@ def learn(env,
         if t % SAVE_EVERY_N_STEPS == 0 and model_initialized:
             training_log = ({'t_log': t_log, 'mean_reward_log': mean_reward_log, 'best_mean_log': best_mean_log, 'episodes_log': episodes_log,
                 'exploration_log': exploration_log, 'learning_rate_log': learning_rate_log})
-            output_file_name = 'space'+str(lr_multiplier)+'_' + str(t) + '_data.pkl'
+            output_file_name = os.path.join(data_dir, 'data.pkl')
             with open(output_file_name, 'wb') as f:
                 pickle.dump(training_log, f)
 

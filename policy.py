@@ -7,7 +7,7 @@ class LinearAnnealedPolicy():
         self.session = session
         self.env = env
         self.eps_final = eps_final
-        self.eps_decrement = (eps_init - eps_final) / num_iterations
+        self.eps_decrement = 1.5*((eps_init - eps_final) / num_iterations)
         self.eps_init = eps_init 
         self.current_eps = eps_init
 

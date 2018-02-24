@@ -35,7 +35,7 @@ def atari_learn(env, session, num_timesteps):
 
     lr_multiplier = 1.0
     lr_schedule = PiecewiseSchedule([(0, 1e-4 * lr_multiplier),
-                                     (num_iterations / 10, 1e-4 * lr_multiplier),
+                                     (num_iterations / 5, 1e-4 * lr_multiplier),
                                      (num_iterations / 2,  5e-5 * lr_multiplier)],
                                       outside_value=5e-5 * lr_multiplier)
     optimizer = dqn.OptimizerSpec(
@@ -64,7 +64,7 @@ def atari_learn(env, session, num_timesteps):
         batch_size=32,
         gamma=0.99,
         learning_starts=50000,
-        learning_freq=4,
+        learning_freq=6,
         frame_history_len=4,
         target_update_freq=10000,
         grad_norm_clipping=10
@@ -99,10 +99,10 @@ def get_env(task, seed):
     set_global_seeds(seed)
     env.seed(seed)
 
-    expt_dir = '/tmp/dqn/'
+    expt_dir = '/home/jsenec/repos/DQN-XPL/vid'
 
     # Some code to change the rate at which videos are recorded
-    env = wrappers.Monitor(env, osp.join(expt_dir, "gym"), force=True, video_callable=lambda episode_id: episode_id%100==0)
+    env = wrappers.Monitor(env, osp.join(expt_dir, "gym"), force=True, video_callable=lambda episode_id: episode_id%500==0)
     env = wrap_deepmind(env)
 
     return env

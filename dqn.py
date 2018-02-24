@@ -93,12 +93,16 @@ def learn(env,
     # set up placeholders
     # placeholder for current observation (or state)
     obs_t_ph = tf.placeholder(tf.uint8, [None] + list(input_shape))
+
     # placeholder for current action
     act_t_ph = tf.placeholder(tf.int32,   [None])
+
     # placeholder for current reward
     rew_t_ph = tf.placeholder(tf.float32, [None])
+
     # placeholder for next observation (or state)
     obs_tp1_ph = tf.placeholder(tf.uint8, [None] + list(input_shape))
+    
     # placeholder for end of episode mask
     # this value is 1 if the next state corresponds to the end of an episode,
     # in which case there is no Q-value at the next state; at the end of an

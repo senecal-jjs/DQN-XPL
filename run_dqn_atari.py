@@ -99,10 +99,10 @@ def get_env(task, seed):
     set_global_seeds(seed)
     env.seed(seed)
 
-    expt_dir = '/tmp/dqn/'
+    expt_dir = '/home/jsenec/repos/DQN-XPL/vid'
 
     # Some code to change the rate at which videos are recorded
-    env = wrappers.Monitor(env, osp.join(expt_dir, "gym"), force=True, video_callable=lambda episode_id: episode_id%100==0)
+    env = wrappers.Monitor(env, osp.join(expt_dir, "gym"), force=True, video_callable=lambda episode_id: episode_id%500==0)
     env = wrap_deepmind(env)
 
     return env

@@ -88,6 +88,7 @@ def learn(env,
     else:
         img_h, img_w, img_c = env.observation_space.shape
         input_shape = (img_h, img_w, frame_history_len * img_c)
+        
     num_actions = env.action_space.n
 
     # set up placeholders
@@ -102,7 +103,7 @@ def learn(env,
 
     # placeholder for next observation (or state)
     obs_tp1_ph = tf.placeholder(tf.uint8, [None] + list(input_shape))
-    
+
     # placeholder for end of episode mask
     # this value is 1 if the next state corresponds to the end of an episode,
     # in which case there is no Q-value at the next state; at the end of an
@@ -198,13 +199,13 @@ def learn(env,
         t = learning_freq*session.run(tf.train.get_global_step()) + learning_starts
 
         # Repopulate experience replay buffer
-        print("Repopulating experience replay buffer.")
         # Store last_obs into replay buffer
         idx = replay_buffer.store_frame(last_obs)
         act, reward, done = env.action_space.sample(), 0, False
         for _ in range(learning_starts):
             # choose random action
-            act = env.action_space.sample()
+            input_batch = replay_buffer.encode_recent_observation()
+            act = policy.select_action(current_q_func, input_batch, obs_t_ph, t)
             # Step simulator forward one step
             last_obs, reward, done, info = env.step(act)
             replay_buffer.store_effect(idx, act, reward, done) # Store action taken after last_obs and corresponding reward
@@ -304,8 +305,8 @@ def learn(env,
             best_mean_log.append(best_mean_episode_reward)
             print("episodes %d" % len(episode_rewards))
             episodes_log.append(len(episode_rewards))
-            print("exploration %f" % policy.current_eps)
-            exploration_log.append(policy.current_eps)
+            print("exploration parameter %f" % policy.cur_val)
+            exploration_log.append(policy.cur_val)
             print("learning_rate %f\n" % optimizer_spec.lr_schedule.value(t))
             learning_rate_log.append(optimizer_spec.lr_schedule.value(t))
             sys.stdout.flush()

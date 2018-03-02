@@ -116,7 +116,7 @@ def main():
     task = benchmark.tasks[6]
 
     # Run training
-    seed = random.randint(0, 5) # Use a seed of zero (you may want to randomize the seed!)
+    seed = 0 #random.randint(0, 5) # Use a seed of zero (you may want to randomize the seed!)
     env = get_env(task, seed)
     session = get_session()
     #atari_learn(env, session, num_timesteps=task.max_timesteps)

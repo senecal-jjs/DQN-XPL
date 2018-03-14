@@ -11,7 +11,7 @@ import dqn
 from dqn_utils import *
 from atari_wrappers import *
 from policy import LinearAnnealedPolicy
-
+from policy import BoltzmannPolicy
 
 def atari_model(img_in, num_actions, scope, reuse=False):
     # as described in https://storage.googleapis.com/deepmind-data/assets/papers/DeepMindNature14236Paper.pdf
@@ -51,7 +51,8 @@ def atari_learn(env, session, num_timesteps):
         return t >= num_timesteps
 
     # Create action exploration/exploitation policy
-    policy = LinearAnnealedPolicy(session=session, env=env, num_iterations=num_iterations)
+    #policy = LinearAnnealedPolicy(session=session, env=env, num_iterations=num_iterations)
+    policy = BoltzmannPolicy(session=session, num_iterations=num_iterations)
 
     dqn.learn(
         env,
@@ -116,11 +117,11 @@ def main():
     task = benchmark.tasks[6]
 
     # Run training
-    seed = 0 #random.randint(0, 5) # Use a seed of zero (you may want to randomize the seed!)
+    seed = random.randint(0, 5) # Use a seed of zero (you may want to randomize the seed!)
     env = get_env(task, seed)
     session = get_session()
     #atari_learn(env, session, num_timesteps=task.max_timesteps)
-    atari_learn(env, session, num_timesteps=16000000)
+    atari_learn(env, session, num_timesteps=20000000)
 
 if __name__ == "__main__":
     main()

@@ -14,6 +14,7 @@ import pickle
 OptimizerSpec = namedtuple("OptimizerSpec", ["constructor", "kwargs", "lr_schedule"])
 
 def learn(env,
+          diff_argument,
           policy,
           q_func,
           optimizer_spec,
@@ -96,7 +97,7 @@ def learn(env,
     obs_t_ph = tf.placeholder(tf.uint8, [None] + list(input_shape))
 
     # placeholder for current action
-    act_t_ph = tf.placeholder(tf.int32,   [None])
+    act_t_ph = tf.placeholder(tf.int32, [None])
 
     # placeholder for current reward
     rew_t_ph = tf.placeholder(tf.float32, [None])
@@ -154,9 +155,9 @@ def learn(env,
 
     # update_target_fn will be called periodically to copy Q network to target Q network
     update_target_fn = []
-    for var, var_target in zip(sorted(q_func_vars,        key=lambda v: v.name),
-                               sorted(target_q_func_vars, key=lambda v: v.name)):
+    for var, var_target in zip(sorted(q_func_vars, key=lambda v: v.name), sorted(target_q_func_vars, key=lambda v: v.name)):
         update_target_fn.append(var_target.assign(var))
+
     update_target_fn = tf.group(*update_target_fn)
 
     # construct the replay buffer
@@ -171,7 +172,6 @@ def learn(env,
     best_mean_episode_reward = -float('inf')
     last_obs = env.reset()
     t = 0
-    restore = False 
     LOG_EVERY_N_STEPS = 10000
     SAVE_EVERY_N_STEPS = 200000
 
@@ -246,8 +246,13 @@ def learn(env,
             input_batch = replay_buffer.encode_recent_observation()
             act = policy.select_action(current_q_func, input_batch, obs_t_ph, t)
 
-        # Step simulator forward one step
-        last_obs, reward, done, info = env.step(act)
+        # Step simulator forward one step, if difference frames being used, take the subtraction here
+        if diff_argument:
+            current_obs, reward, done, info = env.step(act) 
+            last_obs = current_obs - last_obs
+        else:   
+            last_obs, reward, done, info = env.step(act)
+
         replay_buffer.store_effect(idx, act, reward, done) # Store action taken after last_obs and corresponding reward
 
         if done == True: # done was True in latest transition; we have already stored that

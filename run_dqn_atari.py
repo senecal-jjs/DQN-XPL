@@ -29,7 +29,7 @@ def atari_model(img_in, num_actions, scope, reuse=False):
 
         return out
 
-def atari_learn(env, session, num_timesteps):
+def atari_learn(env, session, diff_argument, num_timesteps):
     # This is just a rough estimate
     num_iterations = float(num_timesteps) / 4.0
 
@@ -54,6 +54,7 @@ def atari_learn(env, session, num_timesteps):
 
     dqn.learn(
         env,
+        diff_argument,
         policy = policy,
         q_func=atari_model,
         optimizer_spec=optimizer,
@@ -99,7 +100,8 @@ def get_env(task, seed):
     set_global_seeds(seed)
     env.seed(seed)
 
-    expt_dir = '/home/jsenec/repos/DQN-XPL/vid'
+    #expt_dir = '/home/jsenec/repos/DQN-XPL/vid'
+    expt_dir = '/Users/jsen/Repos/DQN-XPL/vid'
 
     # Some code to change the rate at which videos are recorded
     env = wrappers.Monitor(env, osp.join(expt_dir, "gym"), force=True, video_callable=lambda episode_id: episode_id%500==0)
@@ -107,7 +109,7 @@ def get_env(task, seed):
 
     return env
 
-def main():
+def main(diff_argument):
     # Get Atari games.
     benchmark = gym.benchmark_spec('Atari40M')
 
@@ -118,8 +120,11 @@ def main():
     seed = 0 #random.randint(0, 5) # Use a seed of zero (you may want to randomize the seed!)
     env = get_env(task, seed)
     session = get_session()
-    atari_learn(env, session, num_timesteps=task.max_timesteps)
-    # atari_learn(env, session, num_timesteps=10000000)
+    atari_learn(env, session, diff_argument, num_timesteps=task.max_timesteps)
+    # atari_learn(env, session, diff_argument, num_timesteps=10000000)
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-d", "--difference", help="use difference frames", action="store_true")
+    args = parser.parse_args()
+    main(args.difference)

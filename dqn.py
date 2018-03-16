@@ -10,6 +10,7 @@ from collections import namedtuple
 from dqn_utils import *
 from memory import ReplayBuffer
 import pickle
+import matplotlib.pyplot as plt
 
 OptimizerSpec = namedtuple("OptimizerSpec", ["constructor", "kwargs", "lr_schedule"])
 
@@ -171,6 +172,7 @@ def learn(env,
     mean_episode_reward      = -float('nan')
     best_mean_episode_reward = -float('inf')
     last_obs = env.reset()
+    current_obs = last_obs # required for difference frames 
     t = 0
     LOG_EVERY_N_STEPS = 10000
     SAVE_EVERY_N_STEPS = 200000
@@ -248,8 +250,9 @@ def learn(env,
 
         # Step simulator forward one step, if difference frames being used, take the subtraction here
         if diff_argument:
-            current_obs, reward, done, info = env.step(act) 
-            last_obs = current_obs - last_obs
+            intermediate_obs, reward, done, info = env.step(act) 
+            last_obs = intermediate_obs - current_obs
+            current_obs = intermediate_obs
         else:   
             last_obs, reward, done, info = env.step(act)
 

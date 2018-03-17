@@ -14,7 +14,7 @@ class LinearAnnealedPolicy():
     def select_action(self, current_q_func, input_batch, current_observation, time):
         f = lambda t : -self.eps_decrement*t + self.eps_init
         eps = np.maximum(f(time), self.eps_final)
-        if random.random() < self.current_eps:
+        if random.random() < self.cur_val:
             action = self.env.action_space.sample()
         else:
             q_vals = self.session.run(current_q_func, {current_observation: input_batch[None, :]})

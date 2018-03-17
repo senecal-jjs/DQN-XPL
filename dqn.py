@@ -10,7 +10,6 @@ from collections import namedtuple
 from dqn_utils import *
 from memory import ReplayBuffer
 import pickle
-import matplotlib.pyplot as plt
 
 OptimizerSpec = namedtuple("OptimizerSpec", ["constructor", "kwargs", "lr_schedule"])
 
@@ -321,7 +320,7 @@ def learn(env,
 
         if t % SAVE_EVERY_N_STEPS == 0 and model_initialized:
             training_log = ({'t_log': t_log, 'mean_reward_log': mean_reward_log, 'best_mean_log': best_mean_log, 'episodes_log': episodes_log,
-                'exploration_log': exploration_log, 'learning_rate_log': learning_rate_log})
+                'exploration_log': exploration_log, 'learning_rate_log': learning_rate_log, 'rewards': episode_rewards})
             output_file_name = os.path.join(data_dir, 'data.pkl')
             with open(output_file_name, 'wb') as f:
                 pickle.dump(training_log, f)

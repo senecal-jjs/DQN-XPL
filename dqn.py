@@ -4,6 +4,7 @@ import gym.spaces
 import itertools
 import numpy as np
 import random
+import time 
 import tensorflow as tf
 import tensorflow.contrib.layers as layers
 from collections import namedtuple
@@ -217,6 +218,7 @@ def learn(env,
 
         print("Model successfully restored at timestep {0}!".format(t))
 
+    start_time = time.clock()
     while True:
         ### 1. Check stopping criterion
         if stopping_criterion is not None and stopping_criterion(env, t):
@@ -319,8 +321,9 @@ def learn(env,
             sys.stdout.flush()
 
         if t % SAVE_EVERY_N_STEPS == 0 and model_initialized:
+            current_time = time.clock()
             training_log = ({'t_log': t_log, 'mean_reward_log': mean_reward_log, 'best_mean_log': best_mean_log, 'episodes_log': episodes_log,
-                'exploration_log': exploration_log, 'learning_rate_log': learning_rate_log, 'rewards': episode_rewards})
+                'exploration_log': exploration_log, 'learning_rate_log': learning_rate_log, 'rewards': episode_rewards, 'elapsed_time': current_time-start_time})
             output_file_name = os.path.join(data_dir, 'data.pkl')
             with open(output_file_name, 'wb') as f:
                 pickle.dump(training_log, f)

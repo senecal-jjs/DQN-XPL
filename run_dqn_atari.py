@@ -11,6 +11,7 @@ import dqn
 from dqn_utils import *
 from atari_wrappers import *
 from policy import LinearAnnealedPolicy
+from policy import BoltzmannPolicy
 
 
 def atari_model(img_in, num_actions, scope, reuse=False):
@@ -36,8 +37,8 @@ def atari_learn(env, session, num_timesteps):
     lr_multiplier = 1.0
     lr_schedule = PiecewiseSchedule([(0, 1e-4 * lr_multiplier),
                                      (num_iterations / 5, 1e-4 * lr_multiplier),
-                                     (num_iterations / 2,  5e-5 * lr_multiplier)],
-                                      outside_value=5e-5 * lr_multiplier)
+                                     (num_iterations / 2,  1e-4 * lr_multiplier)],
+                                      outside_value=1e-4 * lr_multiplier)
     optimizer = dqn.OptimizerSpec(
         constructor=tf.train.AdamOptimizer,
         kwargs=dict(epsilon=1e-4),
@@ -47,10 +48,12 @@ def atari_learn(env, session, num_timesteps):
     def stopping_criterion(env, t):
         # notice that here t is the number of steps of the wrapped env,
         # which is different from the number of steps in the underlying env
-        return get_wrapper_by_name(env, "Monitor").get_total_steps() >= num_timesteps
+        #return get_wrapper_by_name(env, "Monitor").get_total_steps() >= num_timesteps
+        return t >= num_timesteps
 
     # Create action exploration/exploitation policy
-    policy = LinearAnnealedPolicy(session=session, env=env, num_iterations=num_iterations)
+    #policy = LinearAnnealedPolicy(session=session, env=env, num_iterations=num_iterations)
+    policy = BoltzmannPolicy(session=session, num_iterations=num_iterations)
 
     dqn.learn(
         env,
@@ -64,7 +67,7 @@ def atari_learn(env, session, num_timesteps):
         batch_size=32,
         gamma=0.99,
         learning_starts=50000,
-        learning_freq=6,
+        learning_freq=4,
         frame_history_len=4,
         target_update_freq=10000,
         grad_norm_clipping=10
@@ -99,7 +102,7 @@ def get_env(task, seed):
     set_global_seeds(seed)
     env.seed(seed)
 
-    expt_dir = '/home/jsenec/repos/DQN-XPL/vid'
+    expt_dir = '/tmp/dqn'
 
     # Some code to change the rate at which videos are recorded
     env = wrappers.Monitor(env, osp.join(expt_dir, "gym"), force=True, video_callable=lambda episode_id: episode_id%500==0)
@@ -115,11 +118,11 @@ def main():
     task = benchmark.tasks[6]
 
     # Run training
-    seed = 0 #random.randint(0, 5) # Use a seed of zero (you may want to randomize the seed!)
+    seed = random.randint(0, 5) # Use a seed of zero (you may want to randomize the seed!)
     env = get_env(task, seed)
     session = get_session()
-    atari_learn(env, session, num_timesteps=task.max_timesteps)
-    # atari_learn(env, session, num_timesteps=10000000)
+    #atari_learn(env, session, num_timesteps=task.max_timesteps)
+    atari_learn(env, session, num_timesteps=15000000)
 
 if __name__ == "__main__":
     main()

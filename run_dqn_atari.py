@@ -13,7 +13,6 @@ from atari_wrappers import *
 from policy import LinearAnnealedPolicy
 from policy import BoltzmannPolicy
 
-
 def atari_model(img_in, num_actions, scope, reuse=False):
     # as described in https://storage.googleapis.com/deepmind-data/assets/papers/DeepMindNature14236Paper.pdf
     with tf.variable_scope(scope, reuse=reuse):
@@ -30,7 +29,7 @@ def atari_model(img_in, num_actions, scope, reuse=False):
 
         return out
 
-def atari_learn(env, session, num_timesteps):
+def atari_learn(env, session, diff_argument, num_timesteps):
     # This is just a rough estimate
     num_iterations = float(num_timesteps) / 4.0
 
@@ -48,15 +47,16 @@ def atari_learn(env, session, num_timesteps):
     def stopping_criterion(env, t):
         # notice that here t is the number of steps of the wrapped env,
         # which is different from the number of steps in the underlying env
-        #return get_wrapper_by_name(env, "Monitor").get_total_steps() >= num_timesteps
+        # return get_wrapper_by_name(env, "Monitor").get_total_steps() >= num_timesteps
         return t >= num_timesteps
 
     # Create action exploration/exploitation policy
-    #policy = LinearAnnealedPolicy(session=session, env=env, num_iterations=num_iterations)
-    policy = BoltzmannPolicy(session=session, num_iterations=num_iterations)
+    policy = LinearAnnealedPolicy(session=session, env=env, num_iterations=num_iterations)
+    # policy = BoltzmannPolicy(session=session, num_iterations=num_iterations)
 
     dqn.learn(
         env,
+        diff_argument,
         policy = policy,
         q_func=atari_model,
         optimizer_spec=optimizer,
@@ -110,7 +110,7 @@ def get_env(task, seed):
 
     return env
 
-def main():
+def main(diff_argument):
     # Get Atari games.
     benchmark = gym.benchmark_spec('Atari40M')
 
@@ -121,8 +121,10 @@ def main():
     seed = random.randint(0, 5) # Use a seed of zero (you may want to randomize the seed!)
     env = get_env(task, seed)
     session = get_session()
-    #atari_learn(env, session, num_timesteps=task.max_timesteps)
-    atari_learn(env, session, num_timesteps=15000000)
+    atari_learn(env, session, diff_argument, num_timesteps=15000000)
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-d", "--difference", help="use difference frames", action="store_true")
+    args = parser.parse_args()
+    main(args.difference)

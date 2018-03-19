@@ -4,6 +4,7 @@ import gym.spaces
 import itertools
 import numpy as np
 import random
+import time 
 import tensorflow as tf
 import tensorflow.contrib.layers as layers
 from collections import namedtuple
@@ -14,6 +15,7 @@ import pickle
 OptimizerSpec = namedtuple("OptimizerSpec", ["constructor", "kwargs", "lr_schedule"])
 
 def learn(env,
+          diff_argument,
           policy,
           q_func,
           optimizer_spec,
@@ -96,7 +98,7 @@ def learn(env,
     obs_t_ph = tf.placeholder(tf.uint8, [None] + list(input_shape))
 
     # placeholder for current action
-    act_t_ph = tf.placeholder(tf.int32,   [None])
+    act_t_ph = tf.placeholder(tf.int32, [None])
 
     # placeholder for current reward
     rew_t_ph = tf.placeholder(tf.float32, [None])
@@ -154,9 +156,9 @@ def learn(env,
 
     # update_target_fn will be called periodically to copy Q network to target Q network
     update_target_fn = []
-    for var, var_target in zip(sorted(q_func_vars,        key=lambda v: v.name),
-                               sorted(target_q_func_vars, key=lambda v: v.name)):
+    for var, var_target in zip(sorted(q_func_vars, key=lambda v: v.name), sorted(target_q_func_vars, key=lambda v: v.name)):
         update_target_fn.append(var_target.assign(var))
+
     update_target_fn = tf.group(*update_target_fn)
 
     # construct the replay buffer
@@ -170,8 +172,8 @@ def learn(env,
     mean_episode_reward      = -float('nan')
     best_mean_episode_reward = -float('inf')
     last_obs = env.reset()
+    current_obs = last_obs # required for difference frames 
     t = 0
-    restore = False 
     LOG_EVERY_N_STEPS = 10000
     SAVE_EVERY_N_STEPS = 200000
 
@@ -216,6 +218,7 @@ def learn(env,
 
         print("Model successfully restored at timestep {0}!".format(t))
 
+    start_time = time.clock()
     while True:
         ### 1. Check stopping criterion
         if stopping_criterion is not None and stopping_criterion(env, t):
@@ -246,8 +249,14 @@ def learn(env,
             input_batch = replay_buffer.encode_recent_observation()
             act = policy.select_action(current_q_func, input_batch, obs_t_ph, t)
 
-        # Step simulator forward one step
-        last_obs, reward, done, info = env.step(act)
+        # Step simulator forward one step, if difference frames being used, take the subtraction here
+        if diff_argument:
+            intermediate_obs, reward, done, info = env.step(act) 
+            last_obs = intermediate_obs - current_obs
+            current_obs = intermediate_obs
+        else:   
+            last_obs, reward, done, info = env.step(act)
+
         replay_buffer.store_effect(idx, act, reward, done) # Store action taken after last_obs and corresponding reward
 
         if done == True: # done was True in latest transition; we have already stored that
@@ -312,8 +321,9 @@ def learn(env,
             sys.stdout.flush()
 
         if t % SAVE_EVERY_N_STEPS == 0 and model_initialized:
+            current_time = time.clock()
             training_log = ({'t_log': t_log, 'mean_reward_log': mean_reward_log, 'best_mean_log': best_mean_log, 'episodes_log': episodes_log,
-                'exploration_log': exploration_log, 'learning_rate_log': learning_rate_log})
+                'exploration_log': exploration_log, 'learning_rate_log': learning_rate_log, 'rewards': episode_rewards, 'elapsed_time': current_time-start_time})
             output_file_name = os.path.join(data_dir, 'data.pkl')
             with open(output_file_name, 'wb') as f:
                 pickle.dump(training_log, f)

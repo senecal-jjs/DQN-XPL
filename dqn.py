@@ -124,6 +124,7 @@ def learn(env,
     episodes_log = []
     exploration_log = []
     learning_rate_log = []
+    time_log = []
     global_step = tf.Variable(0, trainable=False, name='global_step')
 
     # Create a network to produce the current q values for each possible action
@@ -316,14 +317,16 @@ def learn(env,
             episodes_log.append(len(episode_rewards))
             print("exploration parameter %f" % policy.cur_val)
             exploration_log.append(policy.cur_val)
-            print("learning_rate %f\n" % optimizer_spec.lr_schedule.value(t))
+            print("learning_rate %f" % optimizer_spec.lr_schedule.value(t))
             learning_rate_log.append(optimizer_spec.lr_schedule.value(t))
+            current_time = time.clock()
+            print("Elapsed Time: {0} hrs\n".format((current_time-start_time)/3600))
+            time_log.append(current_time-start_time)
             sys.stdout.flush()
 
         if t % SAVE_EVERY_N_STEPS == 0 and model_initialized:
-            current_time = time.clock()
             training_log = ({'t_log': t_log, 'mean_reward_log': mean_reward_log, 'best_mean_log': best_mean_log, 'episodes_log': episodes_log,
-                'exploration_log': exploration_log, 'learning_rate_log': learning_rate_log, 'rewards': episode_rewards, 'elapsed_time': current_time-start_time})
+                'exploration_log': exploration_log, 'learning_rate_log': learning_rate_log, 'rewards': episode_rewards, 'elapsed_time': time_log})
             output_file_name = os.path.join(data_dir, 'data.pkl')
             with open(output_file_name, 'wb') as f:
                 pickle.dump(training_log, f)
